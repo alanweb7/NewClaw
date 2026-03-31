@@ -115,7 +115,7 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 			},
 		},
 		Store:  false,
-		Stream: false,
+		Stream: true,
 	}
 	b, _ := json.Marshal(body)
 
