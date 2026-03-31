@@ -20,6 +20,14 @@ import (
 	"newclaw/pkg/types"
 )
 
+const (
+	defaultCodexClientID   = "app_EMoamEEZ73f0CkXaXp7hrann"
+	defaultAuthorizeURL    = "https://auth.openai.com/oauth/authorize"
+	defaultTokenURL        = "https://auth.openai.com/oauth/token"
+	defaultRedirectURI     = "http://localhost:1455/auth/callback"
+	defaultCodexOriginator = "pi"
+)
+
 func Run(root string) error {
 	cfg, err := config.LoadOrCreate(root)
 	if err != nil {
@@ -94,20 +102,35 @@ func setupOAuth(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 		email = "default"
 	}
 
-	clientID := strings.TrimSpace(readLine(r, "OAuth Client ID (opcional): "))
+	clientID := strings.TrimSpace(readLine(r, "OAuth Client ID [default app_EMoamEEZ73f0CkXaXp7hrann]: "))
+	if clientID == "" {
+		clientID = defaultCodexClientID
+	}
 	authorizeURL := strings.TrimSpace(readLine(r, "Authorize URL [default https://auth.openai.com/oauth/authorize]: "))
 	if authorizeURL == "" {
-		authorizeURL = "https://auth.openai.com/oauth/authorize"
+		authorizeURL = defaultAuthorizeURL
 	}
 	tokenURL := strings.TrimSpace(readLine(r, "Token URL [default https://auth.openai.com/oauth/token]: "))
 	if tokenURL == "" {
-		tokenURL = "https://auth.openai.com/oauth/token"
+		tokenURL = defaultTokenURL
 	}
-	redirectURI := "http://127.0.0.1:53682/callback"
+	redirectURI := strings.TrimSpace(readLine(r, "Redirect URI [default http://localhost:1455/auth/callback]: "))
+	if redirectURI == "" {
+		redirectURI = defaultRedirectURI
+	}
 
 	codeVerifier, codeChallenge, state := pkceState()
 	scopes := "openid profile email offline_access"
-	authLink := buildAuthURL(authorizeURL, clientID, redirectURI, scopes, state, codeChallenge)
+	authLink := buildAuthURL(authorizeURL, oauthAuthorizeParams{
+		ClientID:             clientID,
+		RedirectURI:          redirectURI,
+		Scopes:               scopes,
+		State:                state,
+		CodeChallenge:        codeChallenge,
+		IDTokenOrganizations: true,
+		SimplifiedFlow:       true,
+		Originator:           defaultCodexOriginator,
+	})
 
 	fmt.Println("Abra o link abaixo no navegador e conclua o login OAuth:")
 	fmt.Println(authLink)
@@ -214,19 +237,39 @@ func pkceState() (verifier, challenge, state string) {
 	return verifier, challenge, state
 }
 
-func buildAuthURL(authorizeURL, clientID, redirectURI, scopes, state, challenge string) string {
+type oauthAuthorizeParams struct {
+	ClientID             string
+	RedirectURI          string
+	Scopes               string
+	State                string
+	CodeChallenge        string
+	IDTokenOrganizations bool
+	SimplifiedFlow       bool
+	Originator           string
+}
+
+func buildAuthURL(authorizeURL string, p oauthAuthorizeParams) string {
 	u, err := url.Parse(authorizeURL)
 	if err != nil {
 		return authorizeURL
 	}
 	q := u.Query()
 	q.Set("response_type", "code")
-	q.Set("client_id", clientID)
-	q.Set("redirect_uri", redirectURI)
-	q.Set("scope", scopes)
-	q.Set("state", state)
-	q.Set("code_challenge", challenge)
+	q.Set("client_id", p.ClientID)
+	q.Set("redirect_uri", p.RedirectURI)
+	q.Set("scope", p.Scopes)
+	q.Set("state", p.State)
+	q.Set("code_challenge", p.CodeChallenge)
 	q.Set("code_challenge_method", "S256")
+	if p.IDTokenOrganizations {
+		q.Set("id_token_add_organizations", "true")
+	}
+	if p.SimplifiedFlow {
+		q.Set("codex_cli_simplified_flow", "true")
+	}
+	if strings.TrimSpace(p.Originator) != "" {
+		q.Set("originator", p.Originator)
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

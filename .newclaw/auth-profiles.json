@@ -5,8 +5,8 @@
       "type": "oauth",
       "provider": "openai-codex",
       "email": "user@example.com",
-      "access": "access_demo",
-      "refresh": "refresh_demo"
+      "access": "acc",
+      "refresh": "ref"
     }
   },
   "last_good": {
