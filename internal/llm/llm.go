@@ -41,6 +41,7 @@ type responsesRequest struct {
 	Model        string              `json:"model"`
 	Instructions string              `json:"instructions,omitempty"`
 	Input        []responseInputItem `json:"input"`
+	Store        bool                `json:"store"`
 	Stream       bool                `json:"stream"`
 }
 
@@ -113,6 +114,7 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 				Content: userPrompt,
 			},
 		},
+		Store:  false,
 		Stream: false,
 	}
 	b, _ := json.Marshal(body)
