@@ -76,6 +76,7 @@ func setupAPIKey(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 
 	cfg.Model.Provider = "openai-compatible"
 	cfg.Model.BaseURL = "https://api.openai.com/v1"
+	cfg.Model.Transport = "openai-chat-completions"
 	cfg.Model.DefaultModel = model
 	cfg.Model.APIKeyEnv = "OPENAI_API_KEY"
 
@@ -118,6 +119,10 @@ func setupOAuth(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 	if redirectURI == "" {
 		redirectURI = defaultRedirectURI
 	}
+	fmt.Println("Transporte OAuth para requests do modelo:")
+	fmt.Println("  1) OpenClaw-compatible (recomendado)")
+	fmt.Println("  2) Chat Completions (legado)")
+	transportChoice := strings.TrimSpace(readLine(r, "Opcao [1/2]: "))
 
 	codeVerifier, codeChallenge, state := pkceState()
 	scopes := "openid profile email offline_access"
@@ -176,6 +181,11 @@ func setupOAuth(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 
 	cfg.Model.Provider = "openai-codex"
 	cfg.Model.BaseURL = "https://chatgpt.com/backend-api"
+	if transportChoice == "2" {
+		cfg.Model.Transport = "openai-chat-completions"
+	} else {
+		cfg.Model.Transport = "openclaw-codex-responses"
+	}
 	cfg.Model.DefaultModel = "gpt-5.3-codex"
 	cfg.Model.APIKeyEnv = ""
 

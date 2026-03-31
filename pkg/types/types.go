@@ -17,6 +17,7 @@ type HTTPConfig struct {
 type ModelConfig struct {
 	Provider       string `json:"provider"`
 	BaseURL        string `json:"base_url"`
+	Transport      string `json:"transport"`
 	APIKeyEnv      string `json:"api_key_env"`
 	DefaultModel   string `json:"default_model"`
 	RequestTimeout int    `json:"request_timeout_seconds"`

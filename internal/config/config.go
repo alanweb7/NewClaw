@@ -19,6 +19,7 @@ func DefaultConfig() types.RuntimeConfig {
 		Model: types.ModelConfig{
 			Provider:       "openai-compatible",
 			BaseURL:        "https://api.openai.com/v1",
+			Transport:      "openai-chat-completions",
 			APIKeyEnv:      "OPENAI_API_KEY",
 			DefaultModel:   "gpt-4o-mini",
 			RequestTimeout: 60,
@@ -73,6 +74,9 @@ func applyDefaults(cfg *types.RuntimeConfig) {
 	}
 	if cfg.Model.BaseURL == "" {
 		cfg.Model.BaseURL = d.Model.BaseURL
+	}
+	if cfg.Model.Transport == "" {
+		cfg.Model.Transport = d.Model.Transport
 	}
 	if cfg.Model.APIKeyEnv == "" {
 		cfg.Model.APIKeyEnv = d.Model.APIKeyEnv
