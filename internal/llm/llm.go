@@ -38,10 +38,16 @@ type chatResponse struct {
 }
 
 type responsesRequest struct {
-	Model        string `json:"model"`
-	Instructions string `json:"instructions,omitempty"`
-	Input        string `json:"input"`
-	Stream       bool   `json:"stream"`
+	Model        string              `json:"model"`
+	Instructions string              `json:"instructions,omitempty"`
+	Input        []responseInputItem `json:"input"`
+	Stream       bool                `json:"stream"`
+}
+
+type responseInputItem struct {
+	Type    string `json:"type"`
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 func New(root string, cfg types.ModelConfig) *Client {
@@ -100,8 +106,14 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 	body := responsesRequest{
 		Model:        c.cfg.DefaultModel,
 		Instructions: systemPrompt,
-		Input:        userPrompt,
-		Stream:       false,
+		Input: []responseInputItem{
+			{
+				Type:    "message",
+				Role:    "user",
+				Content: userPrompt,
+			},
+		},
+		Stream: false,
 	}
 	b, _ := json.Marshal(body)
 
