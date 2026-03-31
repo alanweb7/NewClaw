@@ -15,13 +15,15 @@ type HTTPConfig struct {
 }
 
 type ModelConfig struct {
-	Provider       string `json:"provider"`
-	BaseURL        string `json:"base_url"`
-	Transport      string `json:"transport"`
-	APIKeyEnv      string `json:"api_key_env"`
-	DefaultModel   string `json:"default_model"`
-	RequestTimeout int    `json:"request_timeout_seconds"`
-	MaxRetries     int    `json:"max_retries"`
+	Provider        string `json:"provider"`
+	BaseURL         string `json:"base_url"`
+	Transport       string `json:"transport"`
+	APIKeyEnv       string `json:"api_key_env"`
+	DefaultModel    string `json:"default_model"`
+	MaxOutputTokens int    `json:"max_output_tokens"`
+	StopOnFirstLine bool   `json:"stop_on_first_line"`
+	RequestTimeout  int    `json:"request_timeout_seconds"`
+	MaxRetries      int    `json:"max_retries"`
 }
 
 type ToolPolicy struct {

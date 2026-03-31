@@ -78,6 +78,8 @@ func setupAPIKey(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 	cfg.Model.BaseURL = "https://api.openai.com/v1"
 	cfg.Model.Transport = "openai-chat-completions"
 	cfg.Model.DefaultModel = model
+	cfg.Model.MaxOutputTokens = 128
+	cfg.Model.StopOnFirstLine = false
 	cfg.Model.APIKeyEnv = "OPENAI_API_KEY"
 
 	if keyMode == "1" {
@@ -187,6 +189,8 @@ func setupOAuth(root string, cfg *types.RuntimeConfig, r *bufio.Reader) error {
 		cfg.Model.Transport = "openclaw-codex-responses"
 	}
 	cfg.Model.DefaultModel = "gpt-5.3-codex"
+	cfg.Model.MaxOutputTokens = 128
+	cfg.Model.StopOnFirstLine = false
 	cfg.Model.APIKeyEnv = ""
 
 	id := "openai-codex:" + email

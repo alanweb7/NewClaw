@@ -1,13 +1,13 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -27,8 +27,9 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []chatMessage `json:"messages"`
+	Model     string        `json:"model"`
+	Messages  []chatMessage `json:"messages"`
+	MaxTokens int           `json:"max_tokens,omitempty"`
 }
 
 type chatResponse struct {
@@ -38,11 +39,12 @@ type chatResponse struct {
 }
 
 type responsesRequest struct {
-	Model        string              `json:"model"`
-	Instructions string              `json:"instructions,omitempty"`
-	Input        []responseInputItem `json:"input"`
-	Store        bool                `json:"store"`
-	Stream       bool                `json:"stream"`
+	Model           string              `json:"model"`
+	Instructions    string              `json:"instructions,omitempty"`
+	Input           []responseInputItem `json:"input"`
+	MaxOutputTokens int                 `json:"max_output_tokens,omitempty"`
+	Store           bool                `json:"store"`
+	Stream          bool                `json:"stream"`
 }
 
 type responseInputItem struct {
@@ -88,6 +90,7 @@ func (c *Client) completeChatCompletions(ctx context.Context, bearer, systemProm
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
+		MaxTokens: c.cfg.MaxOutputTokens,
 	}
 	b, _ := json.Marshal(body)
 	return c.postWithRetries(ctx, endpoint, b, bearer, func(respBody []byte) (string, error) {
@@ -114,15 +117,16 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 				Content: userPrompt,
 			},
 		},
-		Store:  false,
-		Stream: true,
+		MaxOutputTokens: c.cfg.MaxOutputTokens,
+		Store:           false,
+		Stream:          true,
 	}
 	b, _ := json.Marshal(body)
 
 	var lastErr error
 	for _, p := range paths {
 		endpoint := strings.TrimRight(c.cfg.BaseURL, "/") + p
-		answer, err := c.postWithRetries(ctx, endpoint, b, bearer, parseResponsesText)
+		answer, err := c.postResponsesStreamWithRetries(ctx, endpoint, b, bearer)
 		if err == nil {
 			return answer, nil
 		}
@@ -132,6 +136,59 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 			continue
 		}
 		return "", lastErr
+	}
+	return "", lastErr
+}
+
+func (c *Client) postResponsesStreamWithRetries(ctx context.Context, endpoint string, body []byte, bearer string) (string, error) {
+	var lastErr error
+	for i := 0; i <= c.cfg.MaxRetries; i++ {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream, application/json")
+		req.Header.Set("Authorization", "Bearer "+bearer)
+		req.Header.Set("User-Agent", "NewClaw/1.0")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			respBody, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			lastErr = formatHTTPError(resp.StatusCode, respBody)
+			continue
+		}
+
+		ct := strings.ToLower(resp.Header.Get("Content-Type"))
+		if strings.Contains(ct, "text/event-stream") {
+			text, err := parseSSEOutputFromReader(resp.Body, c.cfg.StopOnFirstLine)
+			_ = resp.Body.Close()
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if strings.TrimSpace(text) == "" {
+				lastErr = fmt.Errorf("empty model response")
+				continue
+			}
+			return text, nil
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		text, err := parseResponsesText(respBody)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if strings.TrimSpace(text) == "" {
+			lastErr = fmt.Errorf("empty model response")
+			continue
+		}
+		return text, nil
 	}
 	return "", lastErr
 }
@@ -268,35 +325,77 @@ func asHTTPStatusError(err error, out **httpStatusError) bool {
 }
 
 func parseSSEOutputText(raw string) string {
-	lines := strings.Split(raw, "\n")
-	var parts []string
-	re := regexp.MustCompile(`"text"\s*:\s*"([^"]*)"`)
-	for _, ln := range lines {
-		ln = strings.TrimSpace(ln)
+	text, _ := parseSSEOutputFromReader(strings.NewReader(raw), false)
+	return text
+}
+
+func parseSSEOutputFromReader(r io.Reader, stopOnFirstLine bool) (string, error) {
+	scanner := bufio.NewScanner(r)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	var b strings.Builder
+	var lastDelta string
+	var lastSnapshot string
+
+	for scanner.Scan() {
+		ln := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(ln, "data:") {
 			continue
 		}
 		payload := strings.TrimSpace(strings.TrimPrefix(ln, "data:"))
-		if payload == "" || payload == "[DONE]" {
+		if payload == "" {
 			continue
 		}
+		if payload == "[DONE]" {
+			break
+		}
+
 		var evt map[string]interface{}
-		if json.Unmarshal([]byte(payload), &evt) == nil {
-			if t := asString(evt["text"]); t != "" {
-				parts = append(parts, t)
-				continue
+		if err := json.Unmarshal([]byte(payload), &evt); err != nil {
+			continue
+		}
+
+		typ := asString(evt["type"])
+		switch typ {
+		case "response.output_text.delta":
+			delta := asString(evt["delta"])
+			if delta != "" && delta != lastDelta {
+				b.WriteString(delta)
+				lastDelta = delta
 			}
-			if t := asString(evt["output_text"]); t != "" {
-				parts = append(parts, t)
-				continue
+		case "response.output_text.done":
+			text := asString(evt["text"])
+			if text != "" && text != lastSnapshot {
+				cur := b.String()
+				if cur == "" || strings.HasPrefix(text, cur) {
+					b.Reset()
+					b.WriteString(text)
+				}
+				lastSnapshot = text
+			}
+		default:
+			if text := asString(evt["output_text"]); text != "" && text != lastSnapshot {
+				cur := b.String()
+				if cur == "" || strings.HasPrefix(text, cur) {
+					b.Reset()
+					b.WriteString(text)
+				}
+				lastSnapshot = text
 			}
 		}
-		// fallback for escaped JSON that still contains "text":"..."
-		if m := re.FindStringSubmatch(payload); len(m) == 2 {
-			parts = append(parts, strings.ReplaceAll(m[1], `\n`, "\n"))
+
+		if stopOnFirstLine {
+			cur := b.String()
+			if idx := strings.IndexByte(cur, '\n'); idx >= 0 {
+				return strings.TrimSpace(cur[:idx]), nil
+			}
 		}
 	}
-	return strings.TrimSpace(strings.Join(parts, "\n"))
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(b.String()), nil
 }
 
 func looksLikeSSE(raw string) bool {

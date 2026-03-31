@@ -17,13 +17,15 @@ func DefaultConfig() types.RuntimeConfig {
 			Port: 7840,
 		},
 		Model: types.ModelConfig{
-			Provider:       "openai-compatible",
-			BaseURL:        "https://api.openai.com/v1",
-			Transport:      "openai-chat-completions",
-			APIKeyEnv:      "OPENAI_API_KEY",
-			DefaultModel:   "gpt-4o-mini",
-			RequestTimeout: 60,
-			MaxRetries:     2,
+			Provider:        "openai-compatible",
+			BaseURL:         "https://api.openai.com/v1",
+			Transport:       "openai-chat-completions",
+			APIKeyEnv:       "OPENAI_API_KEY",
+			DefaultModel:    "gpt-4o-mini",
+			MaxOutputTokens: 128,
+			StopOnFirstLine: false,
+			RequestTimeout:  60,
+			MaxRetries:      2,
 		},
 		Tools: types.ToolPolicy{
 			ExecAllow: []string{},
@@ -83,6 +85,9 @@ func applyDefaults(cfg *types.RuntimeConfig) {
 	}
 	if cfg.Model.DefaultModel == "" {
 		cfg.Model.DefaultModel = d.Model.DefaultModel
+	}
+	if cfg.Model.MaxOutputTokens == 0 {
+		cfg.Model.MaxOutputTokens = d.Model.MaxOutputTokens
 	}
 	if cfg.Model.RequestTimeout == 0 {
 		cfg.Model.RequestTimeout = d.Model.RequestTimeout
