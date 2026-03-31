@@ -180,7 +180,7 @@ func (c *Client) postWithRetries(
 
 func parseResponsesText(respBody []byte) (string, error) {
 	raw := strings.TrimSpace(string(respBody))
-	if strings.HasPrefix(raw, "data:") {
+	if looksLikeSSE(raw) {
 		if txt := parseSSEOutputText(raw); txt != "" {
 			return txt, nil
 		}
@@ -297,6 +297,14 @@ func parseSSEOutputText(raw string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+func looksLikeSSE(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	return strings.HasPrefix(trimmed, "data:") ||
+		strings.HasPrefix(trimmed, "event:") ||
+		strings.Contains(trimmed, "\ndata:") ||
+		strings.Contains(trimmed, "\nevent:")
 }
 
 func codexResponsePaths(baseURL string) []string {
