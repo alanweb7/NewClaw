@@ -39,12 +39,11 @@ type chatResponse struct {
 }
 
 type responsesRequest struct {
-	Model           string              `json:"model"`
-	Instructions    string              `json:"instructions,omitempty"`
-	Input           []responseInputItem `json:"input"`
-	MaxOutputTokens int                 `json:"max_output_tokens,omitempty"`
-	Store           bool                `json:"store"`
-	Stream          bool                `json:"stream"`
+	Model        string              `json:"model"`
+	Instructions string              `json:"instructions,omitempty"`
+	Input        []responseInputItem `json:"input"`
+	Store        bool                `json:"store"`
+	Stream       bool                `json:"stream"`
 }
 
 type responseInputItem struct {
@@ -117,9 +116,8 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 				Content: userPrompt,
 			},
 		},
-		MaxOutputTokens: c.cfg.MaxOutputTokens,
-		Store:           false,
-		Stream:          true,
+		Store:  false,
+		Stream: true,
 	}
 	b, _ := json.Marshal(body)
 
