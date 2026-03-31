@@ -94,7 +94,7 @@ func (c *Client) completeChatCompletions(ctx context.Context, bearer, systemProm
 }
 
 func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPrompt, userPrompt string) (string, error) {
-	paths := []string{"/openai-codex-responses", "/codex/responses", "/responses", "/v1/responses"}
+	paths := codexResponsePaths(c.cfg.BaseURL)
 	body := responsesRequest{
 		Model:        c.cfg.DefaultModel,
 		Instructions: systemPrompt,
@@ -109,7 +109,7 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 		if err == nil {
 			return answer, nil
 		}
-		lastErr = err
+		lastErr = fmt.Errorf("endpoint %s failed: %w", endpoint, err)
 	}
 	return "", lastErr
 }
@@ -217,4 +217,12 @@ func looksLikeCloudflareChallenge(body string) bool {
 func asString(v interface{}) string {
 	s, _ := v.(string)
 	return s
+}
+
+func codexResponsePaths(baseURL string) []string {
+	base := strings.ToLower(strings.TrimRight(baseURL, "/"))
+	if strings.HasSuffix(base, "/backend-api") {
+		return []string{"/codex/responses", "/openai-codex-responses"}
+	}
+	return []string{"/backend-api/codex/responses", "/backend-api/openai-codex-responses"}
 }
