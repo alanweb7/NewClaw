@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "http": {
+    "host": "127.0.0.1",
+    "port": 7840
+  },
+  "model": {
+    "provider": "openai-codex",
+    "base_url": "https://chatgpt.com/backend-api",
+    "api_key_env": "",
+    "default_model": "gpt-5.3-codex",
+    "request_timeout_seconds": 60,
+    "max_retries": 2
+  },
+  "tools": {
+    "exec_allow": [],
+    "exec_deny": [
+      "rm",
+      "rmdir",
+      "del",
+      "format",
+      "shutdown",
+      "reboot"
+    ]
+  }
+}

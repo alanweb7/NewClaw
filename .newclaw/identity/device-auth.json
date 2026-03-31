@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "device_id": "fca38e12abad7af5e775888475f8b33cb7089f7f8ff12e597b8f14f2df0df653",
+  "tokens": {
+    "operator": {
+      "token": "g3rGa3ASOS094R4xf249ln5oB6TIzBdSDRtUOUv5nD0",
+      "role": "operator",
+      "scopes": [
+        "operator.read",
+        "operator.write",
+        "operator.admin"
+      ],
+      "updated_at_ms": 1774986425171
+    }
+  }
+}

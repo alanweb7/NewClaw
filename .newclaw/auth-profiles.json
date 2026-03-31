@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "profiles": {
+    "openai-codex:user@example.com": {
+      "type": "oauth",
+      "provider": "openai-codex",
+      "email": "user@example.com",
+      "access": "access_demo",
+      "refresh": "refresh_demo"
+    }
+  },
+  "last_good": {
+    "openai-codex": "openai-codex:user@example.com"
+  }
+}

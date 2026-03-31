@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "items": {
+    "1774986427196915000": {
+      "session_id": "1774986427196915000",
+      "agent_id": "main",
+      "updated_at": "2026-03-31T19:47:07.2561531Z",
+      "event_count": 2,
+      "session_file": "E:\\apps\\ALANCLAW\\NewClaw\\.newclaw\\agents\\main\\sessions\\1774986427196915000.jsonl"
+    },
+    "1774986442903998200": {
+      "session_id": "1774986442903998200",
+      "agent_id": "main",
+      "updated_at": "2026-03-31T19:47:22.9277619Z",
+      "event_count": 2,
+      "session_file": "E:\\apps\\ALANCLAW\\NewClaw\\.newclaw\\agents\\main\\sessions\\1774986442903998200.jsonl"
+    }
+  }
+}

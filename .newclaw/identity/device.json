@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "device_id": "fca38e12abad7af5e775888475f8b33cb7089f7f8ff12e597b8f14f2df0df653",
+  "public_key_pem": "-----BEGIN PUBLIC KEY-----\ntRXmZU1iwXIXoNGOyGhOvRxxr/CKBGfVsnZ53/QuozY=\n-----END PUBLIC KEY-----\n",
+  "private_key_pem": "-----BEGIN PRIVATE KEY-----\nqmK7UgQ6jM8iZLiRFujttMhpfrkd5AMMihp4r5CIuGy1FeZlTWLBcheg0Y7IaE69\nHHGv8IoEZ9Wydnnf9C6jNg==\n-----END PRIVATE KEY-----\n",
+  "created_at_ms": 1774986425158
+}
