@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ type responsesRequest struct {
 	Model        string `json:"model"`
 	Instructions string `json:"instructions,omitempty"`
 	Input        string `json:"input"`
+	Stream       bool   `json:"stream"`
 }
 
 func New(root string, cfg types.ModelConfig) *Client {
@@ -99,6 +101,7 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 		Model:        c.cfg.DefaultModel,
 		Instructions: systemPrompt,
 		Input:        userPrompt,
+		Stream:       false,
 	}
 	b, _ := json.Marshal(body)
 
@@ -110,6 +113,11 @@ func (c *Client) completeCodexResponses(ctx context.Context, bearer, systemPromp
 			return answer, nil
 		}
 		lastErr = fmt.Errorf("endpoint %s failed: %w", endpoint, err)
+		var hs *httpStatusError
+		if ok := asHTTPStatusError(err, &hs); ok && hs.StatusCode == http.StatusNotFound {
+			continue
+		}
+		return "", lastErr
 	}
 	return "", lastErr
 }
@@ -138,7 +146,7 @@ func (c *Client) postWithRetries(
 		_ = resp.Body.Close()
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			lastErr = formatHTTPError(respBody)
+			lastErr = formatHTTPError(resp.StatusCode, respBody)
 			continue
 		}
 
@@ -157,6 +165,14 @@ func (c *Client) postWithRetries(
 }
 
 func parseResponsesText(respBody []byte) (string, error) {
+	raw := strings.TrimSpace(string(respBody))
+	if strings.HasPrefix(raw, "data:") {
+		if txt := parseSSEOutputText(raw); txt != "" {
+			return txt, nil
+		}
+		return "", fmt.Errorf("could not parse SSE responses payload")
+	}
+
 	// Try a few common wire shapes used by responses-style APIs.
 	var obj map[string]interface{}
 	if err := json.Unmarshal(respBody, &obj); err != nil {
@@ -198,15 +214,24 @@ func parseResponsesText(respBody []byte) (string, error) {
 	return "", fmt.Errorf("could not parse responses payload")
 }
 
-func formatHTTPError(respBody []byte) error {
+type httpStatusError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *httpStatusError) Error() string {
+	return fmt.Sprintf("llm error (%d): %s", e.StatusCode, e.Message)
+}
+
+func formatHTTPError(statusCode int, respBody []byte) error {
 	body := string(respBody)
 	if looksLikeCloudflareChallenge(body) {
-		return fmt.Errorf("llm blocked by Cloudflare challenge on this endpoint")
+		return &httpStatusError{StatusCode: statusCode, Message: "llm blocked by Cloudflare challenge on this endpoint"}
 	}
 	if len(body) > 2000 {
 		body = body[:2000] + "..."
 	}
-	return fmt.Errorf("llm error: %s", body)
+	return &httpStatusError{StatusCode: statusCode, Message: body}
 }
 
 func looksLikeCloudflareChallenge(body string) bool {
@@ -217,6 +242,47 @@ func looksLikeCloudflareChallenge(body string) bool {
 func asString(v interface{}) string {
 	s, _ := v.(string)
 	return s
+}
+
+func asHTTPStatusError(err error, out **httpStatusError) bool {
+	e, ok := err.(*httpStatusError)
+	if !ok {
+		return false
+	}
+	*out = e
+	return true
+}
+
+func parseSSEOutputText(raw string) string {
+	lines := strings.Split(raw, "\n")
+	var parts []string
+	re := regexp.MustCompile(`"text"\s*:\s*"([^"]*)"`)
+	for _, ln := range lines {
+		ln = strings.TrimSpace(ln)
+		if !strings.HasPrefix(ln, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(ln, "data:"))
+		if payload == "" || payload == "[DONE]" {
+			continue
+		}
+		var evt map[string]interface{}
+		if json.Unmarshal([]byte(payload), &evt) == nil {
+			if t := asString(evt["text"]); t != "" {
+				parts = append(parts, t)
+				continue
+			}
+			if t := asString(evt["output_text"]); t != "" {
+				parts = append(parts, t)
+				continue
+			}
+		}
+		// fallback for escaped JSON that still contains "text":"..."
+		if m := re.FindStringSubmatch(payload); len(m) == 2 {
+			parts = append(parts, strings.ReplaceAll(m[1], `\n`, "\n"))
+		}
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
 func codexResponsePaths(baseURL string) []string {
